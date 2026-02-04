@@ -12,8 +12,13 @@ const createEWaste = async (req, res) => {
             return res.status(400).json({ message: 'Please provide all required fields' });
         }
 
-        // Get image URLs from uploaded files
-        const images = req.files ? req.files.map(file => file.path) : [];
+        // Get image URLs from uploaded files (now using fields instead of array)
+        const images = req.files && req.files.images ? req.files.images.map(file => file.path) : [];
+
+        // Get warranty card URL if uploaded
+        const warrantyCard = req.files && req.files.warrantyCard && req.files.warrantyCard[0]
+            ? req.files.warrantyCard[0].path
+            : null;
 
         // Create e-waste item
         const eWaste = await EWaste.create({
@@ -25,7 +30,8 @@ const createEWaste = async (req, res) => {
             quantity: quantity || 1,
             price: price || null,
             location,
-            images
+            images,
+            warrantyCard
         });
 
         res.status(201).json({
@@ -101,9 +107,16 @@ const getEWasteById = async (req, res) => {
             return res.status(404).json({ error: 'E-waste post not found' });
         }
 
+        // Convert to plain object to manipulate
+        const eWasteData = eWaste.toObject();
+
+        // Only include warranty card if the requesting user is the owner
+        const isOwner = eWaste.user._id.toString() === req.user.id || eWaste.user.toString() === req.user.id;
+
         res.status(200).json({
             success: true,
-            data: eWaste
+            data: eWasteData,
+            isOwner: isOwner
         });
     } catch (error) {
         console.error('Get e-waste by ID error:', error);
@@ -151,14 +164,26 @@ const updateEWaste = async (req, res) => {
             }
         }
 
-        // Add new uploaded images
+        // Add new uploaded images (now using fields instead of array)
         let newImages = [];
-        if (req.files && req.files.length > 0) {
-            newImages = req.files.map(file => file.path);
+        if (req.files && req.files.images && req.files.images.length > 0) {
+            newImages = req.files.images.map(file => file.path);
         }
 
-        // Combine and update
+        // Combine and update images
         eWaste.images = [...currentImages, ...newImages];
+
+        // Handle warranty card
+        if (req.files && req.files.warrantyCard && req.files.warrantyCard[0]) {
+            // New warranty card uploaded
+            eWaste.warrantyCard = req.files.warrantyCard[0].path;
+        } else if (req.body.existingWarrantyCard) {
+            // Keep existing warranty card
+            eWaste.warrantyCard = req.body.existingWarrantyCard;
+        } else if (req.body.removeWarrantyCard === 'true') {
+            // Remove warranty card
+            eWaste.warrantyCard = null;
+        }
 
         await eWaste.save();
 

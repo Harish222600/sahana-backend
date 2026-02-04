@@ -31,6 +31,10 @@ const eWasteSchema = new mongoose.Schema({
     images: [{
         type: String
     }],
+    warrantyCard: {
+        type: String,
+        default: null
+    },
     quantity: {
         type: Number,
         default: 1,
